@@ -1,8 +1,6 @@
 import { Button, Form, Input, message, Modal, Space, Steps } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
-
-import AgentForm from "./components/AgentForm"; // Assure-toi d’avoir ce composant
 import TalentStepContacts from "./components/TalentStepContacts";
 import TalentStepExperiences from "./components/TalentStepExperiences";
 import TalentStepInfos from "./components/TalentStepInfos";
@@ -12,13 +10,13 @@ import TalentStepSkills from "./components/TalentStepSkills";
 
 const { Step } = Steps;
 
-export default function TalentAdd() {
+export default function TalentAddWizard() {
   const [form] = Form.useForm();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // États listes initialisés à tableau vide
+  // Options chargées via API
   const [agents, setAgents] = useState([]);
   const [localisations, setLocalisations] = useState([]);
   const [langues, setLangues] = useState([]);
@@ -44,30 +42,28 @@ export default function TalentAdd() {
   const fetchOptions = async () => {
     try {
       const [
-        resAgents,
-        resLoc,
-        resLang,
-        resComp,
-        resCat,
-        resTypeExp,
+        agentsRes,
+        locRes,
+        langRes,
+        compRes,
+        catRes,
+        typeExpRes,
       ] = await Promise.all([
-        axios.get("http://localhost:8000/api/agents/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/localisations/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/langues/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/competences/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/categories-talents/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/types-experience/", { headers: { Authorization: `Token ${token}` } }),
+        axios.get("/api/agents/", { headers: { Authorization: `Token ${token}` } }),
+        axios.get("/api/localisations/", { headers: { Authorization: `Token ${token}` } }),
+        axios.get("/api/langues/", { headers: { Authorization: `Token ${token}` } }),
+        axios.get("/api/competences/", { headers: { Authorization: `Token ${token}` } }),
+        axios.get("/api/categories-talents/", { headers: { Authorization: `Token ${token}` } }),
+        axios.get("/api/types-experience/", { headers: { Authorization: `Token ${token}` } }),
       ]);
-
-      setAgents(Array.isArray(resAgents.data) ? resAgents.data : resAgents.data.results || []);
-      setLocalisations(Array.isArray(resLoc.data) ? resLoc.data : resLoc.data.results || []);
-      setLangues(Array.isArray(resLang.data) ? resLang.data : resLang.data.results || []);
-      setCompetences(Array.isArray(resComp.data) ? resComp.data : resComp.data.results || []);
-      setCategories(Array.isArray(resCat.data) ? resCat.data : resCat.data.results || []);
-      setTypesExperience(Array.isArray(resTypeExp.data) ? resTypeExp.data : resTypeExp.data.results || []);
-    } catch (e) {
+      setAgents(agentsRes.data);
+      setLocalisations(locRes.data);
+      setLangues(langRes.data);
+      setCompetences(compRes.data);
+      setCategories(catRes.data);
+      setTypesExperience(typeExpRes.data);
+    } catch {
       message.error("Erreur lors du chargement des options.");
-      console.error(e);
     }
   };
 
@@ -126,7 +122,7 @@ export default function TalentAdd() {
       if (formData.experiences && formData.experiences.length) data.append("experiences", JSON.stringify(formData.experiences));
       if (formData.attributs && formData.attributs.length) data.append("attributs", JSON.stringify(formData.attributs));
 
-      await axios.post("http://localhost:8000/api/talents/", data, {
+      await axios.post("/api/talents/", data, {
         headers: {
           Authorization: `Token ${token}`,
           "Content-Type": "multipart/form-data",
@@ -138,9 +134,8 @@ export default function TalentAdd() {
       setMediaFiles([]);
       setFormData({});
       setCurrentStep(0);
-    } catch (e) {
+    } catch {
       message.error("Erreur lors de l'ajout du talent.");
-      console.error(e);
     }
     setLoading(false);
   };
@@ -228,23 +223,23 @@ export default function TalentAdd() {
             let url, setter;
             switch (addModal.type) {
               case "localisation":
-                url = "http://localhost:8000/api/localisations/";
+                url = "/api/localisations/";
                 setter = setLocalisations;
                 break;
               case "langue":
-                url = "http://localhost:8000/api/langues/";
+                url = "/api/langues/";
                 setter = setLangues;
                 break;
               case "competence":
-                url = "http://localhost:8000/api/competences/";
+                url = "/api/competences/";
                 setter = setCompetences;
                 break;
               case "categorie":
-                url = "http://localhost:8000/api/categories-talents/";
+                url = "/api/categories-talents/";
                 setter = setCategories;
                 break;
               case "type_experience":
-                url = "http://localhost:8000/api/types-experience/";
+                url = "/api/types-experience/";
                 setter = setTypesExperience;
                 break;
               default:
@@ -268,7 +263,7 @@ export default function TalentAdd() {
           placeholder={`Nom de la ${addModal.type.replace('_', ' ')}`}
           value={addModal.value}
           onChange={e => setAddModal({ ...addModal, value: e.target.value })}
-          onPressEnter={() => {/* même logique que onOk */}}
+          onPressEnter={() => {/* same as onOk */}}
           autoFocus
         />
       </Modal>

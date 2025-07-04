@@ -20,7 +20,7 @@ import {
   Tag,
 } from "antd";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const { Search } = Input;
@@ -41,7 +41,6 @@ export default function TalentListPage() {
   const navigate = useNavigate();
   const token = localStorage.getItem("authToken");
 
-  // Charger options filtres
   useEffect(() => {
     const fetchOptions = async () => {
       try {
@@ -60,13 +59,13 @@ export default function TalentListPage() {
         setLangues(lang.data);
         setCompetences(comp.data);
       } catch (error) {
+        console.error(error);
         message.error("Erreur lors du chargement des options de filtrage.");
       }
     };
     fetchOptions();
   }, [token]);
 
-  // Charger talents selon filtres
   useEffect(() => {
     const fetchTalents = async () => {
       setLoading(true);
@@ -84,7 +83,8 @@ export default function TalentListPage() {
           params,
         });
         setTalents(res.data);
-      } catch (e) {
+      } catch (error) {
+        console.error(error);
         message.error("Erreur lors du chargement des talents.");
         setTalents([]);
       }
@@ -93,33 +93,31 @@ export default function TalentListPage() {
     fetchTalents();
   }, [filters, token]);
 
-  const handleSearch = (value) => setFilters((f) => ({ ...f, search: value }));
-  const handleFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
-
-  const handleAddTalent = () => {
-    navigate("/dashboard/talents-ajouter");
-  };
+  const handleSearch = useCallback(
+    (value) => setFilters((f) => ({ ...f, search: value })),
+    []
+  );
+  const handleFilter = useCallback(
+    (key, value) => setFilters((f) => ({ ...f, [key]: value })),
+    []
+  );
+  const handleAddTalent = useCallback(() => navigate("/dashboard/talents-ajouter"), [navigate]);
 
   return (
     <div style={{ padding: 24 }}>
-      {/* Titre et bouton Ajouter */}
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
           <h2>Liste des talents</h2>
         </Col>
         <Col>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleAddTalent}
-          >
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddTalent}>
             Ajouter un talent
           </Button>
         </Col>
       </Row>
 
-      {/* Filtres */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        {/* Recherches et filtres */}
         <Col xs={24} sm={12} md={8} lg={6}>
           <Search
             placeholder="Rechercher par nom ou description"
@@ -136,7 +134,7 @@ export default function TalentListPage() {
             placeholder="Filtrer par localisation"
             onChange={(v) => handleFilter("localisations", v)}
             filterOption={(input, option) =>
-              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              option.children.toLowerCase().includes(input.toLowerCase())
             }
           >
             {localisations.map((loc) => (
@@ -154,7 +152,7 @@ export default function TalentListPage() {
             placeholder="Filtrer par langue"
             onChange={(v) => handleFilter("langues", v)}
             filterOption={(input, option) =>
-              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              option.children.toLowerCase().includes(input.toLowerCase())
             }
           >
             {langues.map((lang) => (
@@ -172,7 +170,7 @@ export default function TalentListPage() {
             placeholder="Filtrer par compétence"
             onChange={(v) => handleFilter("competences", v)}
             filterOption={(input, option) =>
-              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              option.children.toLowerCase().includes(input.toLowerCase())
             }
           >
             {competences.map((comp) => (
@@ -184,7 +182,6 @@ export default function TalentListPage() {
         </Col>
       </Row>
 
-      {/* Liste des talents */}
       <Spin spinning={loading}>
         <Row gutter={[24, 24]}>
           {talents.length === 0 && !loading && (
@@ -201,11 +198,7 @@ export default function TalentListPage() {
                     <img
                       alt={talent.nom}
                       src={talent.photo_principale}
-                      style={{
-                        objectFit: "cover",
-                        height: 220,
-                        width: "100%",
-                      }}
+                      style={{ objectFit: "cover", height: 220, width: "100%" }}
                     />
                   ) : (
                     <div
@@ -230,7 +223,7 @@ export default function TalentListPage() {
                 <Card.Meta
                   title={
                     <div style={{ fontSize: "18px", fontWeight: "bold" }}>
-                      {talent.nom}
+                      {talent.prenom} {talent.nom}
                     </div>
                   }
                   description={
@@ -240,13 +233,11 @@ export default function TalentListPage() {
                           <CalendarOutlined /> Né(e) le {talent.date_naissance}
                         </div>
                       )}
-                      <div
-                        style={{ fontSize: "14px", margin: "8px 0", minHeight: "40px" }}
-                      >
+                      <div style={{ fontSize: "14px", margin: "8px 0", minHeight: "40px" }}>
                         {talent.description?.slice(0, 70)}
                         {talent.description?.length > 70 ? "..." : ""}
                       </div>
-                      {talent.localisations && talent.localisations.length > 0 && (
+                      {talent.localisations?.length > 0 && (
                         <div style={{ marginTop: 8 }}>
                           <GlobalOutlined />{" "}
                           {talent.localisations.map((loc) => (
@@ -256,7 +247,7 @@ export default function TalentListPage() {
                           ))}
                         </div>
                       )}
-                      {talent.competences && talent.competences.length > 0 && (
+                      {talent.competences?.length > 0 && (
                         <div style={{ marginTop: 4 }}>
                           <StarOutlined />{" "}
                           {talent.competences.map((comp) => (
@@ -266,7 +257,7 @@ export default function TalentListPage() {
                           ))}
                         </div>
                       )}
-                      {talent.contacts && talent.contacts.length > 0 && (
+                      {talent.contacts?.length > 0 && (
                         <div style={{ marginTop: 4 }}>
                           {talent.contacts.map((contact) => {
                             if (contact.type_contact === "telephone")
