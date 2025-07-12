@@ -1,303 +1,367 @@
-import { Button, Form, Input, message, Modal, Space, Steps } from "antd";
+import {
+  MinusCircleOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
+import {
+  Button,
+  DatePicker,
+  Divider,
+  Form,
+  Input,
+  Select,
+  Space,
+  Upload,
+  message,
+} from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import AgentForm from "./components/AgentForm"; // Assure-toi d’avoir ce composant
-import TalentStepContacts from "./components/TalentStepContacts";
-import TalentStepExperiences from "./components/TalentStepExperiences";
-import TalentStepInfos from "./components/TalentStepInfos";
-import TalentStepMediasAttributs from "./components/TalentStepMediasAttributs";
-import TalentStepReview from "./components/TalentStepReview";
-import TalentStepSkills from "./components/TalentStepSkills";
-
-const { Step } = Steps;
+const { Option } = Select;
+const { TextArea } = Input;
 
 export default function TalentAdd() {
   const [form] = Form.useForm();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  // États listes initialisés à tableau vide
-  const [agents, setAgents] = useState([]);
-  const [localisations, setLocalisations] = useState([]);
-  const [langues, setLangues] = useState([]);
-  const [competences, setCompetences] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [typesExperience, setTypesExperience] = useState([]);
-
-  // Uploads
-  const [photoList, setPhotoList] = useState([]);
-  const [mediaFiles, setMediaFiles] = useState([]);
-
-  // Modals
-  const [addModal, setAddModal] = useState({ open: false, type: "", value: "" });
-  const [agentModalOpen, setAgentModalOpen] = useState(false);
-  const [newAgentLoading, setNewAgentLoading] = useState(false);
-
+  const navigate = useNavigate();
   const token = localStorage.getItem("authToken");
 
+  // États pour données de référence
+  const [agents, setAgents] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [competences, setCompetences] = useState([]);
+  const [langues, setLangues] = useState([]);
+  const [localisations, setLocalisations] = useState([]);
+  const [typesExperience, setTypesExperience] = useState([]);
+
   useEffect(() => {
-    fetchOptions();
-  }, []);
+    const config = { headers: { Authorization: `Token ${token}` } };
 
-  const fetchOptions = async () => {
+    const fetch = async (url, setter) => {
+      try {
+        const res = await axios.get(url, config);
+        const data = res.data;
+        if (Array.isArray(data)) setter(data);
+        else if (Array.isArray(data.results)) setter(data.results);
+        else setter([]);
+      } catch {
+        setter([]);
+        message.error(`Erreur chargement ${url}`);
+      }
+    };
+
+    fetch("http://127.0.0.1:8000/api/agents/", setAgents);
+    fetch("http://127.0.0.1:8000/api/categories-talents/", setCategories);
+    fetch("http://127.0.0.1:8000/api/competences/", setCompetences);
+    fetch("http://127.0.0.1:8000/api/langues/", setLangues);
+    fetch("http://127.0.0.1:8000/api/localisations/", setLocalisations);
+    fetch("http://127.0.0.1:8000/api/types-experience/", setTypesExperience);
+  }, [token]);
+
+  const normFile = (e) => (Array.isArray(e) ? e : e && e.fileList);
+
+  const onFinish = async (values) => {
     try {
-      const [
-        resAgents,
-        resLoc,
-        resLang,
-        resComp,
-        resCat,
-        resTypeExp,
-      ] = await Promise.all([
-        axios.get("http://localhost:8000/api/agents/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/localisations/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/langues/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/competences/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/categories-talents/", { headers: { Authorization: `Token ${token}` } }),
-        axios.get("http://localhost:8000/api/types-experience/", { headers: { Authorization: `Token ${token}` } }),
-      ]);
+      const formData = new FormData();
 
-      setAgents(Array.isArray(resAgents.data) ? resAgents.data : resAgents.data.results || []);
-      setLocalisations(Array.isArray(resLoc.data) ? resLoc.data : resLoc.data.results || []);
-      setLangues(Array.isArray(resLang.data) ? resLang.data : resLang.data.results || []);
-      setCompetences(Array.isArray(resComp.data) ? resComp.data : resComp.data.results || []);
-      setCategories(Array.isArray(resCat.data) ? resCat.data : resCat.data.results || []);
-      setTypesExperience(Array.isArray(resTypeExp.data) ? resTypeExp.data : resTypeExp.data.results || []);
-    } catch (e) {
-      message.error("Erreur lors du chargement des options.");
-      console.error(e);
-    }
-  };
+      // Champs simples
+      formData.append("nom", values.nom);
+      formData.append("prenom", values.prenom || "");
+      formData.append("sexe", values.sexe || "");
+      formData.append(
+        "date_naissance",
+        values.date_naissance ? values.date_naissance.format("YYYY-MM-DD") : ""
+      );
+      formData.append("description", values.description || "");
+      formData.append("taille", values.taille || "");
+      formData.append("poids", values.poids || "");
+      formData.append("permis", values.permis || "");
 
-  const steps = [
-    { title: "Infos principales" },
-    { title: "Contacts" },
-    { title: "Compétences & Langues" },
-    { title: "Expériences" },
-    { title: "Médias & Attributs" },
-    { title: "Revue & Validation" },
-  ];
+      // Agent
+      if (values.agent_id) formData.append("agent_id", values.agent_id);
 
-  const next = async () => {
-    try {
-      const values = await form.validateFields();
-      setFormData(prev => ({ ...prev, ...values }));
-      setCurrentStep(currentStep + 1);
-      form.resetFields();
-      form.setFieldsValue({ ...formData, ...values });
-    } catch {
-      message.error("Merci de corriger les erreurs avant de continuer.");
-    }
-  };
+      // Photo principale
+      if (values.photo_principale && values.photo_principale.length > 0) {
+        formData.append("photo_principale", values.photo_principale[0].originFileObj);
+      }
 
-  const prev = () => {
-    setCurrentStep(currentStep - 1);
-    form.resetFields();
-    form.setFieldsValue(formData);
-  };
+      // Relations ManyToMany
+      (values.localisations_ids || []).forEach((id) =>
+        formData.append("localisations_ids", id)
+      );
+      (values.langues_ids || []).forEach((id) => formData.append("langues_ids", id));
+      (values.categories_ids || []).forEach((id) =>
+        formData.append("categories_ids", id)
+      );
 
-  const submit = async () => {
-    setLoading(true);
-    try {
-      const data = new FormData();
-
-      data.append("nom", formData.nom);
-      data.append("prenom", formData.prenom);
-      data.append("sexe", formData.sexe);
-      data.append("date_naissance", formData.date_naissance.format("YYYY-MM-DD"));
-      data.append("description", formData.description || "");
-      data.append("taille", formData.taille || "");
-      data.append("poids", formData.poids || "");
-      data.append("permis", formData.permis || "");
-      if (formData.agent) data.append("agent", formData.agent);
-
-      if (photoList.length > 0) data.append("photo_principale", photoList[0].originFileObj);
-
-      mediaFiles.forEach(file => data.append("medias", file.originFileObj));
-
-      (formData.localisations || []).forEach(id => data.append("localisations", id));
-      (formData.langues || []).forEach(id => data.append("langues", id));
-      (formData.competences || []).forEach(id => data.append("competences", id));
-      (formData.categories || []).forEach(id => data.append("categories", id));
-
-      if (formData.contacts && formData.contacts.length) data.append("contacts", JSON.stringify(formData.contacts));
-      if (formData.experiences && formData.experiences.length) data.append("experiences", JSON.stringify(formData.experiences));
-      if (formData.attributs && formData.attributs.length) data.append("attributs", JSON.stringify(formData.attributs));
-
-      await axios.post("http://localhost:8000/api/talents/", data, {
-        headers: {
-          Authorization: `Token ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
+      // Compétences imbriquées
+      (values.competences_dynamiques || []).forEach((comp, i) => {
+        formData.append(`competences_dynamiques[${i}][competence]`, comp.competence_id);
+        formData.append(`competences_dynamiques[${i}][niveau]`, comp.niveau || "");
+        formData.append(`competences_dynamiques[${i}][details]`, comp.details || "");
       });
-      message.success("Talent ajouté avec succès !");
-      form.resetFields();
-      setPhotoList([]);
-      setMediaFiles([]);
-      setFormData({});
-      setCurrentStep(0);
-    } catch (e) {
-      message.error("Erreur lors de l'ajout du talent.");
-      console.error(e);
-    }
-    setLoading(false);
-  };
 
-  const stepContent = () => {
-    switch (currentStep) {
-      case 0:
-        return (
-          <TalentStepInfos
-            form={form}
-            agents={agents}
-            categories={categories}
-            onAddAgent={() => setAgentModalOpen(true)}
-            onAddCategory={() => setAddModal({ open: true, type: "categorie", value: "" })}
-            photoList={photoList}
-            setPhotoList={setPhotoList}
-          />
+      // Expériences imbriquées
+      (values.experiences_dynamiques || []).forEach((exp, i) => {
+        formData.append(`experiences_dynamiques[${i}][annee]`, exp.annee || "");
+        formData.append(`experiences_dynamiques[${i}][titre]`, exp.titre || "");
+        formData.append(`experiences_dynamiques[${i}][role]`, exp.role || "");
+        formData.append(
+          `experiences_dynamiques[${i}][type_experience]`,
+          exp.type_experience_id || ""
         );
-      case 1:
-        return <TalentStepContacts form={form} />;
-      case 2:
-        return (
-          <TalentStepSkills
-            form={form}
-            localisations={localisations}
-            langues={langues}
-            competences={competences}
-            onAddLocalisation={() => setAddModal({ open: true, type: "localisation", value: "" })}
-            onAddLangue={() => setAddModal({ open: true, type: "langue", value: "" })}
-            onAddCompetence={() => setAddModal({ open: true, type: "competence", value: "" })}
-          />
-        );
-      case 3:
-        return (
-          <TalentStepExperiences
-            form={form}
-            typesExperience={typesExperience}
-            onAddTypeExperience={() => setAddModal({ open: true, type: "type_experience", value: "" })}
-          />
-        );
-      case 4:
-        return (
-          <TalentStepMediasAttributs
-            form={form}
-            mediaFiles={mediaFiles}
-            setMediaFiles={setMediaFiles}
-          />
-        );
-      case 5:
-        return <TalentStepReview data={formData} />;
-      default:
-        return null;
+        formData.append(`experiences_dynamiques[${i}][description]`, exp.description || "");
+      });
+
+      // Attributs imbriqués
+      (values.attributs_dynamiques || []).forEach((attr, i) => {
+        formData.append(`attributs_dynamiques[${i}][cle]`, attr.cle || "");
+        formData.append(`attributs_dynamiques[${i}][valeur]`, attr.valeur || "");
+      });
+
+      // Médias (fichiers)
+      (values.medias || []).forEach((file) => {
+        formData.append("medias_dynamiques", file.originFileObj);
+      });
+
+      await axios.post("http://127.0.0.1:8000/api/talents/", formData, {
+        headers: { "Content-Type": "multipart/form-data", Authorization: `Token ${token}` },
+      });
+
+      message.success("Talent ajouté avec succès !");
+      navigate("/dashboard/talents");
+    } catch (error) {
+      message.error("Erreur lors de l'ajout du talent");
     }
   };
 
   return (
-    <>
-      <Steps current={currentStep} style={{ marginBottom: 24 }}>
-        {steps.map(item => (
-          <Step key={item.title} title={item.title} />
-        ))}
-      </Steps>
-
-      <Form form={form} layout="vertical" initialValues={formData}>
-        {stepContent()}
-
-        <Form.Item>
-          <Space>
-            {currentStep > 0 && <Button onClick={prev}>Précédent</Button>}
-            {currentStep < steps.length - 1 && <Button type="primary" onClick={next}>Suivant</Button>}
-            {currentStep === steps.length - 1 && <Button type="primary" onClick={submit} loading={loading}>Valider</Button>}
-          </Space>
-        </Form.Item>
-      </Form>
-
-      {/* Modal ajout option dynamique */}
-      <Modal
-        open={addModal.open}
-        title={`Ajouter une ${addModal.type.replace('_', ' ')}`}
-        onCancel={() => setAddModal({ open: false, type: "", value: "" })}
-        onOk={async () => {
-          if (!addModal.value.trim()) return;
-          setLoading(true);
-          try {
-            let url, setter;
-            switch (addModal.type) {
-              case "localisation":
-                url = "http://localhost:8000/api/localisations/";
-                setter = setLocalisations;
-                break;
-              case "langue":
-                url = "http://localhost:8000/api/langues/";
-                setter = setLangues;
-                break;
-              case "competence":
-                url = "http://localhost:8000/api/competences/";
-                setter = setCompetences;
-                break;
-              case "categorie":
-                url = "http://localhost:8000/api/categories-talents/";
-                setter = setCategories;
-                break;
-              case "type_experience":
-                url = "http://localhost:8000/api/types-experience/";
-                setter = setTypesExperience;
-                break;
-              default:
-                setLoading(false);
-                return;
-            }
-            const res = await axios.post(url, { nom: addModal.value }, { headers: { Authorization: `Token ${token}` } });
-            setter(prev => [...prev, res.data]);
-            message.success("Ajouté !");
-            setAddModal({ open: false, type: "", value: "" });
-          } catch {
-            message.error("Erreur lors de l'ajout.");
-          }
-          setLoading(false);
-        }}
-        okText="Ajouter"
-        cancelText="Annuler"
-        confirmLoading={loading}
+    <Form form={form} layout="vertical" onFinish={onFinish} scrollToFirstError>
+      <Divider>Informations générales</Divider>
+      <Form.Item
+        name="nom"
+        label="Nom"
+        rules={[{ required: true, message: "Veuillez saisir le nom" }]}
       >
-        <Input
-          placeholder={`Nom de la ${addModal.type.replace('_', ' ')}`}
-          value={addModal.value}
-          onChange={e => setAddModal({ ...addModal, value: e.target.value })}
-          onPressEnter={() => {/* même logique que onOk */}}
-          autoFocus
-        />
-      </Modal>
+        <Input />
+      </Form.Item>
+      <Form.Item name="prenom" label="Prénom">
+        <Input />
+      </Form.Item>
+      <Form.Item name="sexe" label="Sexe">
+        <Select allowClear>
+          {["homme", "femme", "autre"].map((s) => (
+            <Option key={s} value={s}>
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </Option>
+          ))}
+        </Select>
+      </Form.Item>
+      <Form.Item name="date_naissance" label="Date de naissance">
+        <DatePicker style={{ width: "100%" }} />
+      </Form.Item>
+      <Form.Item name="description" label="Description">
+        <TextArea rows={3} />
+      </Form.Item>
 
-      {/* Modal création agent */}
-      <Modal
-        open={agentModalOpen}
-        title="Ajouter un agent"
-        onCancel={() => setAgentModalOpen(false)}
-        footer={null}
+      <Form.Item name="agent_id" label="Agent">
+        <Select placeholder="Sélectionnez un agent" allowClear>
+          {agents.map((agent) => (
+            <Option key={agent.id} value={agent.id}>
+              {agent.nom} {agent.prenom}
+            </Option>
+          ))}
+        </Select>
+      </Form.Item>
+
+      <Form.Item
+        name="photo_principale"
+        label="Photo principale"
+        valuePropName="fileList"
+        getValueFromEvent={normFile}
+        extra="Format JPG/PNG, max 2MB"
       >
-        <AgentForm
-          onCancel={() => setAgentModalOpen(false)}
-          onSuccess={async (agentValues) => {
-            setNewAgentLoading(true);
-            try {
-              const res = await axios.post("/api/agents/", agentValues, { headers: { Authorization: `Token ${token}` } });
-              setAgents(prev => [...prev, res.data]);
-              form.setFieldsValue({ agent: res.data.id });
-              message.success("Agent créé avec succès !");
-              setAgentModalOpen(false);
-            } catch {
-              message.error("Erreur lors de la création de l'agent.");
-            }
-            setNewAgentLoading(false);
-          }}
-          loading={newAgentLoading}
-        />
-      </Modal>
-    </>
+        <Upload listType="picture" maxCount={1} beforeUpload={() => false}>
+          <Button icon={<UploadOutlined />}>Sélectionner une photo</Button>
+        </Upload>
+      </Form.Item>
+
+      <Form.Item name="categories_ids" label="Catégories">
+        <Select mode="multiple" placeholder="Sélectionnez les catégories">
+          {categories.map((cat) => (
+            <Option key={cat.id} value={cat.id}>
+              {cat.nom}
+            </Option>
+          ))}
+        </Select>
+      </Form.Item>
+
+      <Form.Item name="localisations_ids" label="Localisations">
+        <Select mode="multiple" placeholder="Sélectionnez les localisations">
+          {localisations.map((loc) => (
+            <Option key={loc.id} value={loc.id}>
+              {loc.nom}
+            </Option>
+          ))}
+        </Select>
+      </Form.Item>
+
+      <Form.Item name="langues_ids" label="Langues">
+        <Select mode="multiple" placeholder="Sélectionnez les langues">
+          {langues.map((lang) => (
+            <Option key={lang.id} value={lang.id}>
+              {lang.nom}
+            </Option>
+          ))}
+        </Select>
+      </Form.Item>
+
+      <Divider>Compétences</Divider>
+      <Form.List name="competences_dynamiques">
+        {(fields, { add, remove }) => (
+          <>
+            {fields.map(({ key, name, ...restField }) => (
+              <Space
+                key={key}
+                align="baseline"
+                style={{ display: "flex", marginBottom: 8 }}
+              >
+                <Form.Item
+                  {...restField}
+                  name={[name, "competence_id"]}
+                  rules={[{ required: true, message: "Compétence requise" }]}
+                >
+                  <Select placeholder="Compétence" style={{ width: 200 }}>
+                    {competences.map((c) => (
+                      <Option key={c.id} value={c.id}>
+                        {c.nom}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+                <Form.Item {...restField} name={[name, "niveau"]}>
+                  <Input placeholder="Niveau" style={{ width: 150 }} />
+                </Form.Item>
+                <Form.Item {...restField} name={[name, "details"]}>
+                  <Input placeholder="Détails" style={{ width: 250 }} />
+                </Form.Item>
+                <MinusCircleOutlined onClick={() => remove(name)} />
+              </Space>
+            ))}
+            <Form.Item>
+              <Button
+                type="dashed"
+                onClick={() => add()}
+                icon={<PlusOutlined />}
+              >
+                Ajouter une compétence
+              </Button>
+            </Form.Item>
+          </>
+        )}
+      </Form.List>
+
+      <Divider>Expériences</Divider>
+      <Form.List name="experiences_dynamiques">
+        {(fields, { add, remove }) => (
+          <>
+            {fields.map(({ key, name, ...restField }) => (
+              <Space
+                key={key}
+                align="baseline"
+                style={{ display: "flex", marginBottom: 8 }}
+              >
+                <Form.Item {...restField} name={[name, "annee"]}>
+                  <Input placeholder="Année" style={{ width: 100 }} />
+                </Form.Item>
+                <Form.Item
+                  {...restField}
+                  name={[name, "titre"]}
+                  rules={[{ required: true, message: "Titre requis" }]}
+                >
+                  <Input placeholder="Titre" style={{ width: 250 }} />
+                </Form.Item>
+                <Form.Item {...restField} name={[name, "role"]}>
+                  <Input placeholder="Rôle" style={{ width: 200 }} />
+                </Form.Item>
+                <Form.Item {...restField} name={[name, "type_experience_id"]}>
+                  <Select placeholder="Type d'expérience" style={{ width: 200 }}>
+                    {typesExperience.map((t) => (
+                      <Option key={t.id} value={t.id}>
+                        {t.nom}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+                <MinusCircleOutlined onClick={() => remove(name)} />
+              </Space>
+            ))}
+            <Form.Item>
+              <Button
+                type="dashed"
+                onClick={() => add()}
+                icon={<PlusOutlined />}
+              >
+                Ajouter une expérience
+              </Button>
+            </Form.Item>
+          </>
+        )}
+      </Form.List>
+
+      <Divider>Attributs personnalisés</Divider>
+      <Form.List name="attributs_dynamiques">
+        {(fields, { add, remove }) => (
+          <>
+            {fields.map(({ key, name, ...restField }) => (
+              <Space
+                key={key}
+                align="baseline"
+                style={{ display: "flex", marginBottom: 8 }}
+              >
+                <Form.Item
+                  {...restField}
+                  name={[name, "cle"]}
+                  rules={[{ required: true, message: "Clé requise" }]}
+                >
+                  <Input placeholder="Clé" style={{ width: 200 }} />
+                </Form.Item>
+                <Form.Item {...restField} name={[name, "valeur"]}>
+                  <Input placeholder="Valeur" style={{ width: 300 }} />
+                </Form.Item>
+                <MinusCircleOutlined onClick={() => remove(name)} />
+              </Space>
+            ))}
+            <Form.Item>
+              <Button
+                type="dashed"
+                onClick={() => add()}
+                icon={<PlusOutlined />}
+              >
+                Ajouter un attribut
+              </Button>
+            </Form.Item>
+          </>
+        )}
+      </Form.List>
+
+      <Divider>Médias (photos/vidéos)</Divider>
+      <Form.Item
+        name="medias"
+        label="Médias"
+        valuePropName="fileList"
+        getValueFromEvent={normFile}
+      >
+        <Upload listType="picture" multiple beforeUpload={() => false}>
+          <Button icon={<UploadOutlined />}>Ajouter des médias</Button>
+        </Upload>
+      </Form.Item>
+
+      <Form.Item>
+        <Button type="primary" htmlType="submit" style={{ marginTop: 20 }}>
+          Ajouter le talent
+        </Button>
+      </Form.Item>
+    </Form>
   );
 }

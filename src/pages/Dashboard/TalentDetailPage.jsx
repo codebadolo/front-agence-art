@@ -1,8 +1,9 @@
 import {
   CalendarOutlined,
+  EditOutlined,
   MailOutlined,
   PhoneOutlined,
-  UserOutlined
+  UserOutlined,
 } from "@ant-design/icons";
 import {
   Button,
@@ -10,10 +11,11 @@ import {
   Col,
   Divider,
   List,
+  message,
   Row,
   Spin,
   Tag,
-  message,
+  Typography,
 } from "antd";
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -21,13 +23,14 @@ import "jspdf-autotable";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+const { Paragraph } = Typography;
+
 export default function TalentDetailPage() {
   const { slug } = useParams();
   const [talent, setTalent] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const token = localStorage.getItem("authToken");
-
 
   useEffect(() => {
     const fetchTalent = async () => {
@@ -55,14 +58,12 @@ export default function TalentDetailPage() {
 
   if (!talent) return null;
 
-  // URL complète photo principale
   const photoUrl = talent.photo_principale
     ? talent.photo_principale.startsWith("http")
       ? talent.photo_principale
       : `http://localhost:8000${talent.photo_principale}`
     : null;
 
-  // Fonction export PDF
   const exportPDF = () => {
     const doc = new jsPDF();
 
@@ -76,13 +77,11 @@ export default function TalentDetailPage() {
     doc.text("Description:", 14, 50);
     doc.text(talent.description || "Aucune description", 14, 58, { maxWidth: 180 });
 
-    // Localisations
     if (talent.localisations?.length) {
       const locs = talent.localisations.map((l) => l.nom).join(", ");
       doc.text(`Localisations: ${locs}`, 14, 70);
     }
 
-    // Langues
     if (talent.langues?.length) {
       const langs = talent.langues
         .map((l) => (l.niveau ? `${l.nom} (${l.niveau})` : l.nom))
@@ -90,20 +89,22 @@ export default function TalentDetailPage() {
       doc.text(`Langues: ${langs}`, 14, 78);
     }
 
-    // Compétences
     if (talent.competences?.length) {
       const comps = talent.competences.map((c) => c.nom).join(", ");
       doc.text(`Compétences: ${comps}`, 14, 86);
     }
 
-    // Agent
-    if (talent.agent) {
-      doc.text(`Agent: ${talent.agent.prenom || ""} ${talent.agent.nom || ""}`, 14, 94);
-      doc.text(`Email agent: ${talent.agent.email || "N/A"}`, 14, 102);
-      doc.text(`Téléphone agent: ${talent.agent.telephone || "N/A"}`, 14, 110);
+    if (talent.categories?.length) {
+      const cats = talent.categories.map((c) => c.nom).join(", ");
+      doc.text(`Catégories: ${cats}`, 14, 94);
     }
 
-    // Expériences (tableau)
+    if (talent.agent) {
+      doc.text(`Agent: ${talent.agent.prenom || ""} ${talent.agent.nom || ""}`, 14, 102);
+      doc.text(`Email agent: ${talent.agent.email || "N/A"}`, 14, 110);
+      doc.text(`Téléphone agent: ${talent.agent.telephone || "N/A"}`, 14, 118);
+    }
+
     if (talent.experiences?.length) {
       const expData = talent.experiences.map((exp) => [
         exp.annee || "",
@@ -114,7 +115,15 @@ export default function TalentDetailPage() {
       doc.autoTable({
         head: [["Année", "Titre", "Rôle", "Type"]],
         body: expData,
-        startY: 120,
+        startY: 130,
+      });
+    }
+
+    if (talent.attributs?.length) {
+      let startY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 150;
+      doc.text("Attributs:", 14, startY);
+      talent.attributs.forEach((attr, i) => {
+        doc.text(`${attr.cle}: ${attr.valeur}`, 14, startY + 10 + i * 8);
       });
     }
 
@@ -133,6 +142,15 @@ export default function TalentDetailPage() {
         onClick={exportPDF}
       >
         Exporter en PDF
+      </Button>
+
+      <Button
+        type="default"
+        icon={<EditOutlined />}
+        style={{ marginBottom: 16, marginLeft: 16 }}
+        onClick={() => navigate(`/dashboard/talents/edit/${slug}`)}
+      >
+        Modifier le talent
       </Button>
 
       <Row gutter={24}>
@@ -169,7 +187,6 @@ export default function TalentDetailPage() {
               )
             }
           >
-            {/* Galerie photos */}
             {talent.galerie_photos?.length > 0 && (
               <>
                 <Divider orientation="left">Galerie photos</Divider>
@@ -194,7 +211,6 @@ export default function TalentDetailPage() {
               </>
             )}
 
-            {/* Médias vidéos/photos */}
             {talent.medias?.length > 0 && (
               <>
                 <Divider orientation="left">Médias</Divider>
@@ -246,7 +262,9 @@ export default function TalentDetailPage() {
                 <CalendarOutlined /> Né(e) le {talent.date_naissance}
               </p>
             )}
-            <p><b>Description :</b> {talent.description || "Aucune description disponible."}</p>
+            <Paragraph>
+              <b>Description :</b> {talent.description || "Aucune description disponible."}
+            </Paragraph>
             <p><b>Taille :</b> {talent.taille || "N/A"}</p>
             <p><b>Poids :</b> {talent.poids || "N/A"}</p>
             <p><b>Permis :</b> {talent.permis || "N/A"}</p>
@@ -291,8 +309,12 @@ export default function TalentDetailPage() {
               <>
                 <Divider orientation="left">Agent</Divider>
                 <p><b>{talent.agent.prenom} {talent.agent.nom}</b></p>
-                <p>Email : {talent.agent.email}</p>
-                <p>Téléphone : {talent.agent.telephone || "N/A"}</p>
+                <p>Email : <a href={`mailto:${talent.agent.email}`}>{talent.agent.email}</a></p>
+                <p>
+                  Téléphone : {talent.agent.telephone ? (
+                    <a href={`tel:${talent.agent.telephone}`}>{talent.agent.telephone}</a>
+                  ) : "N/A"}
+                </p>
 
                 {talent.agent.contacts?.length > 0 && (
                   <>
@@ -301,13 +323,13 @@ export default function TalentDetailPage() {
                       if (contact.type_contact === "telephone")
                         return (
                           <Tag key={contact.id} icon={<PhoneOutlined />} color="green">
-                            {contact.valeur}
+                            <a href={`tel:${contact.valeur}`}>{contact.valeur}</a>
                           </Tag>
                         );
                       if (contact.type_contact === "email")
                         return (
                           <Tag key={contact.id} icon={<MailOutlined />} color="volcano">
-                            {contact.valeur}
+                            <a href={`mailto:${contact.valeur}`}>{contact.valeur}</a>
                           </Tag>
                         );
                       return null;
